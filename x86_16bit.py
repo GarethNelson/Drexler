@@ -15,38 +15,34 @@ assembler.add_reg('BP',0xBD,16)
 assembler.add_reg('SI',0xBE,16)
 assembler.add_reg('DI',0xBF,16)
 
-def mov_encoder(operand_a,operand_b):
+def mov_encoder(asm,operand_a,operand_b):
     retval = ''
     dest_reg = operand_a[1]
     if operand_b[0]=='LITERAL':
-       retval = struct.pack('cch',chr(0x66),chr(dest_reg),operand_b[1])
+       retval = struct.pack('ccH',chr(0x66),chr(dest_reg),operand_b[1])
     return retval
 
-def push_encoder(operand):
-    pass
-
-def pop_encoder(operand):
-    pass
 
 assembler.add_opcode('MOV',[uniasm.Operand(from_reg=True,from_literal=False),
                             uniasm.Operand(from_reg=True,from_literal=True,from_mem=True,from_regptr=True,bitlength=16)],encoder_func=mov_encoder)
 
 
-assembler.add_opcode('PUSH',[uniasm.Operand(from_reg=True,from_literal=True,bitlength=16)],encoder_func=push_encoder)
 
-assembler.add_opcode('POP', [uniasm.Operand(from_reg=True,from_literal=False)],encoder_func=pop_encoder)
-
-simple_code = """
-    MOV AX, F33D
-    MOV BX, FACE
-    MOV CX, BEEF
-    PUSH AX
-    PUSH BX
-    PUSH CX
-    POP AX
-    POP BX
-    POP CX
+src = """
+    MOV AX, 0xF33D
+    MOV BX, 0xFACE
+    MOV CX, 0xBEEF
 """
 
-print assembler.verify(simple_code)
-print hexlify(assembler.assemble_line('MOV AX, 1234'))
+verify_result = assembler.verify(src)
+if not verify_result[0]:
+   print 'Verification of source failed: %s' % verify_result[1]
+
+output = assembler.compile(src)
+if not output[0]:
+   print 'Output generation failed: %s' % output[2]
+   print 'Output to this point: \n %s' % hexlify(output[1])
+else:
+   print hexlify(output[1])
+
+

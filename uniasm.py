@@ -60,7 +60,10 @@ class Assembler:
            elif operand.startswith('$'):
               parsed_operands.append(['VARIABLE',operand[1:]])
            else:
-              parsed_operands.append(['LITERAL',int(operand)])
+              if operand.startswith('0x'):
+                 parsed_operands.append(['LITERAL',int(operand[2:],16)])
+              else:
+                 parsed_operands.append(['LITERAL',int(operand)])
        return self.known_opcodes_encoders[raw_opcode](self,*parsed_operands)
    def find_var(self,var):
        """ Returns either the variable offset for var or None
@@ -94,17 +97,13 @@ class Assembler:
            try:
               self.bin_data += self.assemble_line(line)
            except Exception,e:
-              return (False,bin_data,'Error on line %d: %s\n\t> %s' % (line_no,str(e),line))
-       print 'Precleanup: %s' % binascii.hexlify(self.bin_data)
+              return (False,self.bin_data,'Error on line %d: %s\n\t> %s' % (line_no,str(e),line))
        for cleanup in self.bin_cleanups:
-           print self.substitute_vars
-           print 'Applying cleanup: %s' % cleanup
            if self.find_var(cleanup[1]) is None: return (False,self.bin_data,'Error during variable resolution: no such symbol %s' % cleanup[1])
            data_bits = bitstring.BitArray(bytes=self.bin_data)
            var_bits  = bitstring.BitArray(bin=format(self.find_var(cleanup[1]),'#018b'))
            data_bits.overwrite(var_bits,cleanup[0]*8)
            self.bin_data = data_bits.tobytes()
-           print 'New data: %s' % binascii.hexlify(self.bin_data)
        return (True,self.bin_data)
    def verify(self,asm_src):
        """ Returns (True,'OK') on success
