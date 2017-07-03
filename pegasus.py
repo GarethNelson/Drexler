@@ -63,7 +63,6 @@ def encode_copybank(asm,src_bank,dst_bank,offset):
        offset_bits = format(offset[1], '#016b')
     elif offset[0]=='VARIABLE':
        var_val = asm.find_var(offset[1])
-       print var_val
        if var_val == None:
           asm.add_cleanup(len(asm.bin_data)+2,offset[1])
           offset_bits = format(0xBEEF, '#016b')
