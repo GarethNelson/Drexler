@@ -62,14 +62,45 @@ def encode_copybank(src_bank,dst_bank,offset):
     retval += uniasm.assemble_bits(src_bits,dst_bits,offset_bits)
     return retval
 
+def encode_mapbank(task_id,virtual_bank,physical_bank):
+    # this is not actually a real opcode, it's OPCODE_REGSAVE so we can assign stuff in global registers
+    # basically to do a MAPBANK we just update the mmap register for the specific task
+    reg_ctx = {0:REGISTER_CTX_TASK0,
+               1:REGISTER_CTX_TASK1,
+               2:REGISTER_CTX_TASK2,
+               3:REGISTER_CTX_TASK3}[task_id[1]]
+    reg_id = make_regid(reg_ctx,REGISTER_TYPE_LOCALMMAP,virtual_bank[1])
+
+    # now we need to assemble the new contents for the mmap register - see pegasus_docs/new_isa.txt
+    new_mmap = uniasm.assemble_bits('0'*16,                        # 16-bits reserved
+                                    '0'*4,                         # 4 bits reserved
+                                    '0001',                        # default permissions 0 on all, but bank present
+                                     format(physical_bank[1],'#008b')) # physical bank
+   
+    # now let's assemble the actual code
+    retval  = ''
+    retval += chr(OPCODE_REGLOAD)
+    retval += uniasm.assemble_bits(format(reg_id,'#008b'),   # register ID
+                                   '00',                     # overwrite and do not zero extend
+                                   '000',                    # set whole register
+                                   '010')                    # set from literal 32-bit
+    retval += new_mmap # the new mmap value
+    return retval
+
 # read pegassus_docs/instruction_set.txt for details on this stuff
 
 assembler.add_opcode('COPYBANK',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),   # source bank
                                  uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),   # destination bank
-                                 uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)],  # address offset
+                                 uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)], # address offset
                                  encoder_func=encode_copybank)
 
+assembler.add_opcode('MAPBANK',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),    # which task are we messing with?
+                                uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),    # which virtual bank are we setting up?
+                                uniasm.Operand(from_reg=False,from_literal=True,bitlength=8)],   # which physical bank do we want to assign to it?
+                                encoder_func=encode_mapbank)
 
+def do_line(l):
+    print '"%s"  =>  0x%s' % (l,hexlify(assembler.assemble_line(l)))
 
-
-print hexlify(assembler.assemble_line('COPYBANK 0 1 20'))
+do_line('COPYBANK 0 1 20')
+do_line('MAPBANK  0 0 1')
