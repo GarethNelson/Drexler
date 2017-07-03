@@ -49,9 +49,34 @@ class Assembler:
            operand = operand.strip(',')
            if self.known_register_id_codes.has_key(operand):
               parsed_operands.append(['REG',self.known_register_id_codes[operand]])
+           elif operand.startswith('$'):
+              parsed_operands.append(['VARIABLE',operand])
            else:
               parsed_operands.append(['LITERAL',int(operand)])
        return self.known_opcodes_encoders[raw_opcode](*parsed_operands)
+   def compile(self,asm_src):
+       """ Returns (True,binary) on success
+           Returns (False,binary,err_msg) on failure - binary is the code compiled so far
+       """
+       bin_data = ''
+       line_no = -1
+       for line in asm_src.split('\n'):
+           line_no += 1
+           line = line.strip()
+           if line.startswith(';'): continue
+           if ':' in line:
+              if count(':') >= 2: return (False,"Error on line %d: too many colon(:) tokens" % line_no)
+              line = line.split(':')[1] # for labels etc
+           if ';' in line:
+              line = line.split(';')[0] # for comments
+           if len(line) <= 2: continue
+           split_line = line.split(' ')
+           if not self.known_opcodes_operands.has_key(split_line[0]): return (False,bin_data,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
+           try:
+              bin_data += self.assemble_line(line)
+           except Exception,e:
+              return (False,bin_data,'Error on line %d: %s\n\t> %s' % (line_no,str(e),line))
+       return (True,bin_data)     
    def verify(self,asm_src):
        """ Returns (True,'OK') on success
            Returns (False,err_msg) on failure

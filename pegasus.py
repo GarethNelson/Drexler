@@ -103,13 +103,20 @@ assembler.add_opcode('MAPBANK',[uniasm.Operand(from_reg=False,from_literal=True,
 def do_line(l):
     print '"%s"  =>  0x%s' % (l,hexlify(assembler.assemble_line(l)))
 
-do_line('COPYBANK 0 1 20')
-do_line('MAPBANK  0 0 1')
+#do_line('COPYBANK 0 1 20')
+#do_line('MAPBANK  0 0 1')
 
-print len(sys.argv)
 
 if len(sys.argv)==2:
    fd = open(sys.argv[1],'r')
    src = fd.read()
    fd.close()
-   print assembler.verify(src)
+   verify_result = assembler.verify(src)
+   if not verify_result[0]:
+      print 'Verification of source failed: %s' % verify_result[1]
+ 
+   output = assembler.compile(src)
+   if not output[0]:
+      print 'Output generation failed: %s' % output[2]
+   else:
+      print hexlify(output[1])
