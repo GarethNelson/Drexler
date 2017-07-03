@@ -1,0 +1,112 @@
+Programmer visible:
+   8 32-bit GPRs per task
+   1 8-bit current bank register per task
+   8 8-bit bank mappings per task - map virtual banks to physical banks (of which there can be up to 256, obviously)
+   1 16-bit local IP offset register per task
+   1 2-bit "current task ID" register, left assigned to the usermode task when executing a syscall or exception handler
+   1 8-bit exception ID register
+   seperate stack memory space per task
+   various flags (global and per task)
+
+I/O channels
+   8-bit channel ID
+   each channel can be read from or written to either a single byte at a time or 32 bits at a time (if underlying hardware supports the longer wordlength)
+   channel 0 by default is system console - an 8-bit stream of characters used for user interaction
+
+Syscall handler
+   Unprivileged tasks may call the kernel (or whatever) by executing the SYSCALL instruction, this causes the syscall handler to run (or an exception to occur)
+   SYSCALL also pushes the current 32-bit IP to the stack (so SYSRET knows where to return)
+   Syscall handlers use the mapping of the calling process, so the kernel code should be mapped somewhere for obvious reasons
+
+Exception handler
+   If an exception occurs the exception ID register is set to the relevant value and 
+
+Internal stuff:
+   branch predicate register: specifies a logical condition that must be evaluated before executing a JMP instruction
+                              essentially a copy of the instruction register containing the branching instruction and a flag
+                              after evaluating the predicate, the flag is set back to 0
+   current instruction register: specifies the current instruction and any operands
+   current state register: specifies the current FSM state
+
+All instructions have multiple versions:
+    Immediate mode        - all operands are read from RAM, all values are 32-bit
+    Register value mode   - all operands are read from registers (including other registers if relevant - for example, if a register is set to value 0, that means the first register)
+    Register pointer mode - all operands are read from memory locations stored in registers as a zero-prefixed 32-bit value (i.e 0x00 followed by the bank followed by the offset)
+    Memory value mode     - all operands are read from memory locations
+    Memory pointer mode   - all operands are read from memory locations pointed to from other memory locations
+
+Memory/task configuration
+   MAPBANK t v p     - map virtual bank v to point to physical bank p for task t
+   ALLOWMAPREAD t v  - allow the task v to read from virtual bank v
+   DENYMAPREAD t v   - prevent task v from reading virtual bank v
+   ALLOWMAPWRITE t v - allow the task v to write to virtual bank v
+   DENYMAPWRITE t v  - prevent task v from writing to virtual bank v
+   ALLOWMAPRUN t v   - allow the task v to execute code from virtual bank v
+   DENYMAPRUN t v    - prevent task v from running code in virtual bank v
+   CLEARMAPPERMS t   - clear all permissions for task t on all virtual banks - the defaults are ZERO permissions to do anything
+   ALLOWMAPALL t v   - allow task t to do everything it wants with virtual bank v
+   ENABLETASK t      - enable task t (i.e set it ready to be scheduled)
+   DISABLETASK t     - disable task t (i.e set it to not be scheduled - this does NOT erase any task state)
+   SETPRIVTASK t     - set task t as privileged
+   UNSETPRIVTASK t   - set task t as unprivileged (this is the default at startup)
+   SETSYSCALL b m    - set the syscall handler to physical bank b at offset m
+   SETEXCEPTION b m  - set the exception handler to physical bank b at offset m
+   SYSRET            - return to a calling task from a syscall
+   SETTASKREG t r v  - set register r of task t to value v - this could be the IP or other registers
+   todo: implement some sort of virtualisation so unprivileged tasks can read/write to virtual devices implemented by privileged tasks
+   ALLOWTASKIO t c   - allow task t to perform I/O on channel c
+   DENYTASKIO t c    - disable I/O for task t on channel c
+   CLEARTASKIO t     - disable I/O for task t on all channels
+   CLEARTASKMAP t    - clear memory bank mappings for task t - this will probably cause things to crash if the task is currently scheduled to run
+   CLEARTASKREGs t   - set all registers for task t to defaults - intended to provide a "clean slate" before swapping in another process in multitasking kernels
+   COPYBANK a b m    - copy all the data in bank a from offset 0 to offset m to bank b at offset 0
+Register/RAM manipulation
+   SETREG r v    - sets register r to value v - remember that v can be indirect
+   SETMEM8 m v   - sets memory at offset m to 8-bit value v (if >8 bits, we ignore the first 24)
+   SETMEM16 m v  - same as above, but uses zero extending etc if needed
+   SETMEM32 m v  - same as above
+   USEBANK b     - sets the current memory bank to b
+Control flow
+   Branch predicates:
+   EQ a b         - evaluates to true if the values a and b are equal
+   NOTEQ a b      - logical inverse of EQ
+   EQZERO a       - shortcut for "EQ a 0"
+   NOTZERO a      - shortcut for "NOTEQ a 0"
+   GREATER a b    - evaluates to true if the value a is greater than the value b
+   LESSER a b     - logical inverse of GREATER (or essentially "GREATER b a")
+   todo: add signed integers, floats and stuff both here and in the arithmetic
+   The 2 JMP instructions below may be modified by setting a branch predicate first
+   If there is an active branch predicate in the register, the JMP will not execute unless the predicate evaluates to true
+   JMPLOCAL m   - local jump within same bank to 16-bit offset m - updates current bank register
+   JMPFAR   b m - far jump to new bank b at 16-bit offset m
+   CALLLOCAL m - push 8-bit bank and 16-bit offset to stack as a zero-prefixed 32-bit value and then do equivalent to JMPLOCAL
+   CALLFAR b m - same, but for a far call
+   RETLOCAL    - return from a CALLLOCAL
+   RETFAR      - return from a CALLFAR
+   SYSCALL     - jump to a predefined syscall handler which runs in privileged mode, if available (otherwise an exception occurs), the syscall handler can return back to the calling task using SYSRET
+Arithmetic
+   results stored in register specified by first param
+   ADD rA rB
+   SUB rA rB
+   DIV rA rB
+   MUL rA rB
+   AND rA rB
+   OR  rA rB
+   NOT rA
+   XOR rA rB
+Stack
+   PUSH v        - push a value to the stack, all values are 32-bit
+   MEMPOPLOCAL m - pop a value from the stack to memory at offset m (16-bit, current bank)
+   MEMPOPFAR b m - pop a value from the stack to memory bank b, offset m
+   REGPOP r      - pop a value into a register
+Debugging etc
+   BREAK - if a privileged task, immediately halts the processor, allowing external debugger to single step etc - if no external debugger is connected, this is basically a full system halt
+           if an unprivileged task, throws an exception which must be handled by a privileged task
+   DEBUGSTR b m - same as BREAK but spits out the C (null terminated) string found at bank b, offset m to debug console first - possibly not a good idea in real hardware, emulation only at present
+I/O
+   WRITEBYTE c b     - write byte b to channel c
+   READBYTE c m      - read a byte from channel c into memory at current bank, offset m
+   WRITEWORD c v     - write a 32-bit value v to channel c
+   READWORDLOCAL c m - read a 32-bit value v from channel c to memory at current bank, offset m
+   READWORDFAR c b m - read a 32-bit value v from channel c into memory bank b at offset m
+

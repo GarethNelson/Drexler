@@ -1,0 +1,106 @@
+8 32-bit GPRs per task
+
+task status register - 1 per task
+     16 bits flags
+        15 integer overflow
+        14 integer carry
+        13 integer negative - result of last integer op was negative
+        12 privileged mode - set high if the task is privileged OR running a syscall/ISR/handler/bla
+        11 in syscall - set high only inside syscalls, cleared by SYSRET
+        10 in exception handler - set high inside exception handlers, cleared by SYSRET
+        09 privileged task - set high if the task itself is privileged (not just temporarily)
+        08 unused
+        07 unused
+        06 unused
+        05 unused
+        04 unused
+        03 currently selected virtual bank bit 3
+        02 currently selected virtual bank bit 2
+        01 currently selected virtual bank bit 1
+        00 currently selected virtual bank bit 0
+     16 bits local IP offset
+
+I/O channel map register (8 per task - maps virtual to physical)
+     all these values must be configured by kernel, they are NOT automatically set by the hardware
+     8 bits hardware class
+       0 console
+     8 bits hardware specific type
+       0 UART
+     8 bits flags
+       7 hardware write 8-bit  - the underlying hardware supports 8-bit write
+       6 hardware read 8-bit   - the underlying hardware supports 8-bit read
+       5 hardware write 32-bit - the underlying hardware supports 32-bit write
+       4 hardware read 32-bit  - the underlying hardware supports 32-bit read
+       3 hardware can write (does not imply permission)
+       2 hardware can read (does not imply permission)
+       1 write permission
+       0 read permission
+     8 bits physical channel ID
+
+memory bank map register (8 per task - maps virtual to physical banks)
+     16 bits reserved/unused
+     4 bits reserved/unused
+     4 bits permissions flags
+       3 execute enabled
+       2 write enabled
+       1 read enabled
+       0 bank present
+     8 bits physical bank
+
+global exception register:
+     8 bits exception ID (set only when exception occurs and not automatically cleared to 0 after)
+     8 bits physical memory bank ID for exception handler
+    16 bits memory offset for exception handler
+
+global syscall register:
+     8 bits syscall ID (set by calling task)
+     8 bits physical memory bank ID for syscall handler
+    16 bits memory offset for syscall handler
+
+global status register:
+     8 bits physical I/O channel count
+     8 bits physical memory bank count
+     8 bits global flags
+       7 halted - set high when halted for the debugger
+       6 exception - set high until cleared by exception handler
+       5 exception handler set - if 0, exceptions will cause a halt
+       4 syscall handler set - if 0, syscalls will cause exceptions
+       3 unused
+       2 unused
+       1 unused
+       0 unused
+     4 bits active task
+     4 bits enabled tasks
+
+per task:
+    8 maps with 4 flags each
+      p/r/w/x - present/read/write/execute
+
+
+GPRs split up:
+  GPR0H (H for High) is the highest 16 bits in GPR0
+  GPR0L is the lowest 16 bits
+  GPR0A is the first 8 bit byte
+  GPR0B is the second 8 bit byte
+  GPR0C is the third 8 bit byte
+  GPR0D is the fourth 8 bit byte
+
+
+
+SETREG    $r $v
+  $r may be ANY register including other task registers (if privileged)
+SETMEMREL $m $v
+USEBANK $b
+  essentially SETREG BANK $v
+SETMEMABS $b $m $v
+  turned into USEBANK
+SYSRET
+COPYBANK $a $b $m
+
+branch predicates
+  only one immediate value allowed
+  must compare between 2 registers or between register and immediate
+
+
+JMP $m
+JMPFAR is turned into USEBANK
