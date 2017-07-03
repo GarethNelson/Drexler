@@ -56,8 +56,9 @@ class Assembler:
        """ Returns (True,'OK') on success
            Returns (False,err_msg) on failure
        """
-       line_no = 0
+       line_no = -1
        for line in asm_src.split('\n'):
+           line_no += 1
            line = line.strip()
            if line.startswith(';'): continue
            if ':' in line:
@@ -69,3 +70,4 @@ class Assembler:
            split_line = line.split(' ')
            if not self.known_opcodes_operands.has_key(split_line[0]): return (False,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
        return (True,'OK')
+

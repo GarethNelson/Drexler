@@ -1,3 +1,4 @@
+import sys
 import uniasm
 from binascii import hexlify
 
@@ -104,3 +105,11 @@ def do_line(l):
 
 do_line('COPYBANK 0 1 20')
 do_line('MAPBANK  0 0 1')
+
+print len(sys.argv)
+
+if len(sys.argv)==2:
+   fd = open(sys.argv[1],'r')
+   src = fd.read()
+   fd.close()
+   print assembler.verify(src)
