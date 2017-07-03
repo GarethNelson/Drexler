@@ -54,16 +54,25 @@ for task in [('',REGISTER_CTX_CURRENT),('T0',REGISTER_CTX_TASK0,),('T1',REGISTER
         assembler.add_reg('%s%s6' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC6),32)
         assembler.add_reg('%s%s7' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC7),32)
 
-def encode_copybank(src_bank,dst_bank,offset):
+def encode_copybank(asm,src_bank,dst_bank,offset):
     retval  = ''
     retval += chr(OPCODE_COPYBANK)
     src_bits = format(src_bank[1], '#004b')
     dst_bits = format(dst_bank[1], '#004b')
-    offset_bits = format(offset[1], '#016b')
+    if offset[0]=='LITERAL':
+       offset_bits = format(offset[1], '#016b')
+    elif offset[0]=='VARIABLE':
+       var_val = asm.find_var(offset[1])
+       print var_val
+       if var_val == None:
+          asm.add_cleanup(len(asm.bin_data)+2,offset[1])
+          offset_bits = format(0xBEEF, '#016b')
+       else:
+          offset_bits = format(int(var_val), '#016b')
     retval += uniasm.assemble_bits(src_bits,dst_bits,offset_bits)
     return retval
 
-def encode_mapbank(task_id,virtual_bank,physical_bank):
+def encode_mapbank(asm,task_id,virtual_bank,physical_bank):
     # this is not actually a real opcode, it's OPCODE_REGSAVE so we can assign stuff in global registers
     # basically to do a MAPBANK we just update the mmap register for the specific task
     reg_ctx = {0:REGISTER_CTX_TASK0,
@@ -118,5 +127,6 @@ if len(sys.argv)==2:
    output = assembler.compile(src)
    if not output[0]:
       print 'Output generation failed: %s' % output[2]
+      print 'Output to this point: \n %s' % hexlify(output[1])
    else:
       print hexlify(output[1])
