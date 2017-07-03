@@ -1,0 +1,230 @@
+register identifiers
+ 3 bit context
+   000 global
+   001 current task
+   010 task 0
+   011 task 1
+   100 task 2
+   101 task 3
+ 2 bit type
+   00 status
+   01 local GPR / global exception
+   10 local mmap / global syscall
+   11 local iomap
+ 3 bit specific
+   000 0
+   001 1
+   010 2
+   011 3
+   100 4
+   101 5
+   110 6
+   111 7
+
+memory bank operations - virtual bank select
+   which task
+     0000 current task (only one allowed for unprivileged code)
+     0001 task 0
+     0010 task 1
+     0011 task 2
+     0100 task 3
+   which virtual bank
+     0000 bank 0
+     0001 bank 1
+     0010 bank 2
+     0011 bank 3
+     0100 bank 4
+     0101 bank 5
+     0110 bank 6
+     0111 bank 7
+
+
+memory bank operations - map update
+   which task
+     0000 task 0
+     0001 task 1
+     0010 task 2
+     0011 task 3
+   which virtual bank
+     000 bank 0
+     001 bank 1
+     010 bank 2
+     011 bank 3
+     100 bank 4
+     101 bank 5
+     110 bank 6
+     111 bank 7
+   which physical bank
+     8-bit byte
+
+memory bank operations - presence update
+   which task
+     000 task 0
+     001 task 1
+     010 task 2
+     011 task 3
+   which virtual bank
+     000 bank 0
+     001 bank 1
+     010 bank 2
+     011 bank 3
+     100 bank 4
+     101 bank 5
+     110 bank 6
+     111 bank 7
+   present flag
+     0 not present
+     1 present
+
+   e.g to set virtual bank 1 as present in task 3
+       011 001 1
+
+memory bank operations - permission masks
+   which task
+     00 task 0
+     01 task 1
+     10 task 2
+     11 task 3
+   which bank
+     000 bank 0
+     001 bank 1
+     010 bank 2
+     011 bank 3
+     100 bank 4
+     101 bank 5
+     110 bank 6
+     111 bank 7
+   permissions mask
+     read/write/execute bitfield
+
+   e.g to allow task 3 to read/write bank 2
+       11 010 110
+   and to allow task 2 to do everything on bank 5
+       10 101 111
+
+I/O channel operations - permission masks
+   which task
+     000 task 0
+     001 task 1
+     010 task 2
+     011 task 3
+   which channel
+     000 channel 0
+     001 channel 1
+     010 channel 2
+     011 channel 3
+     100 channel 4
+     101 channel 5
+     110 channel 6
+     111 channel 7
+   permissions mask
+     read/write
+
+   e.g to allow task 2 to read and write channel 5
+       010 101 11
+
+task configuration mask
+   4-bit task enabled
+     0 task 0
+     1 task 1
+     2 task 2
+     3 task 3
+   4-bit task privileged flag
+     0 task 0
+     1 task 1
+     2 task 2
+     3 task 3
+
+memory address operands
+   pointer flag - offset
+     0000 direct memory reference through virtual bank
+     0001 reference memory through pointer found at address, pointer is 16-bit offset in current bank
+     0010 reference memory through pointer found at address, pointer is 8-bit virtual bank followed by 16-bit offset
+     0100 reference memory through pointer in first register operand, pointer is 16-bit offset in current bank in lowest 16-bits of register
+     0101 reference memory through pointer in first register operand, pointer is 8-bit virtual bank zero extended in lowest 16-bits of register and offset in highest 16 bits
+     0110 reference memory through pointer in both registers, pointer is 8-bit virtual bank zero extended in first operand and 16-bit offset in second operand
+     0111 direct memory reference through physical bank, physical bank is specified in first operand
+   virtual bank
+     0000 default (current) bank or ignore virtual bank 
+     0001 bank 0
+     0010 bank 1
+     0011 bank 2
+     0100 bank 3
+     0101 bank 4
+     0110 bank 5
+     0111 bank 6
+     1000 bank 7
+   optional 8-bit physical bank operand
+   16-bit offset OR 2 register IDs
+
+register load
+   8-bit register ID
+   overwrite or OR
+       0 overwrite
+       1 OR update (for setting flags etc)
+   zero-extend
+       0 do not zero extend
+       1 zero extend
+   set what
+       000 whole register
+       001 byte A
+       010 byte B
+       011 byte C
+       100 byte D
+       101 lowest 2 bytes (bits 0-15)
+       110 highest 2 bytes (bits 16-31)
+   set from
+    000 literal 8-bit
+    001 literal 16-bit
+    010 literal 32-bit
+    011 other register
+    100 memory - read from memory address operand
+   8-bit literal operand, 16-bit literal operand, 32-bit literal operand OR 32-bit memory operand
+
+register save
+   8-bit register ID
+   zero-extend
+    00 do not zero extend
+    01 zero extend
+   save what
+    000 whole register
+    001 byte A
+    010 byte B
+    011 byte C
+    100 byte D
+    101 lowest 2 bytes
+    110 highest 2 bytes
+   save format
+    000 32-bit (4 bytes)
+    001 16-bit (2 bytes)
+    010 8-bit single byte
+   32-bit memory operand
+
+
+opcode encoding
+ 8-bit operation
+ operands (various sizes)
+ 
+ load data into register from literal/reg/RAM
+      opcode 0x01 - REGLOAD
+      see "register load" above for operands
+
+ save data from register to RAM
+      opcode 0x02 - REGSAVE
+      see "register save" above for operands
+
+ copy data between physical banks
+      opcode 0x03 - COPYBANK
+      4-bit operand source bank
+      4-bit operand destination bank
+      16-bit operand offset
+
+
+
+
+
+
+
+
+
+

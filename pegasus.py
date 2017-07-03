@@ -1,4 +1,5 @@
 import uniasm
+from binascii import hexlify
 
 assembler = uniasm.Assembler()
 
@@ -25,6 +26,10 @@ REGISTER_SPEC5 = '101'
 REGISTER_SPEC6 = '110'
 REGISTER_SPEC7 = '111'
 
+OPCODE_REGLOAD  = 0x01
+OPCODE_REGSAVE  = 0x02
+OPCODE_COPYBANK = 0x03
+
 
 def make_regid(reg_ctx,reg_type,reg_specific):
     retval = '0b%s%s%s' % (reg_ctx,reg_type,reg_specific)
@@ -48,14 +53,23 @@ for task in [('',REGISTER_CTX_CURRENT),('T0',REGISTER_CTX_TASK0,),('T1',REGISTER
         assembler.add_reg('%s%s6' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC6),32)
         assembler.add_reg('%s%s7' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC7),32)
 
+def encode_copybank(src_bank,dst_bank,offset):
+    retval  = ''
+    retval += chr(OPCODE_COPYBANK)
+    src_bits = format(src_bank[1], '#004b')
+    dst_bits = format(dst_bank[1], '#004b')
+    offset_bits = format(offset[1], '#016b')
+    retval += uniasm.assemble_bits(src_bits,dst_bits,offset_bits)
+    return retval
 
-print assembler.known_register_lengths.keys()
-assembler.add_opcode('ADD',uniasm.Operand(from_reg=True,from_literal=False,bitlength=16),
-                           uniasm.Operand(from_reg=True,from_literal=True,bitlength=16))
+# read pegassus_docs/instruction_set.txt for details on this stuff
 
-simple_addcode = """
-   ADD GPR0 GPR1
-   ADD GPR3 1337
-"""
+assembler.add_opcode('COPYBANK',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),   # source bank
+                                 uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),   # destination bank
+                                 uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)],  # address offset
+                                 encoder_func=encode_copybank)
 
-print assembler.verify(simple_addcode)
+
+
+
+print hexlify(assembler.assemble_line('COPYBANK 0 1 20'))

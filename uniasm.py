@@ -1,3 +1,12 @@
+import bitstring
+
+def assemble_bits(*bits):
+    """ Utility function to turn a string of bits into a string of bytes
+    """
+    retval = bitstring.BitArray()
+    for b in bits:
+        retval.append(bitstring.BitArray(bin=b))
+    return retval.tobytes()
 
 class Operand:
    def __init__(self,from_reg=False,from_literal=False,from_mem=False,from_regptr=False,bitlength=8):
