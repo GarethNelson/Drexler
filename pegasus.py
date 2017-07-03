@@ -44,6 +44,8 @@ assembler.add_reg('SYSCALL',  make_regid(REGISTER_CTX_GLOBAL,REGISTER_TYPE_GLOBA
 # now setup per task registers
 for task in [('',REGISTER_CTX_CURRENT),('T0',REGISTER_CTX_TASK0,),('T1',REGISTER_CTX_TASK1),('T2',REGISTER_CTX_TASK2),('T3',REGISTER_CTX_TASK3)]:
     assembler.add_reg('%sSTATUS' % task[0],make_regid(task[1],REGISTER_TYPE_STATUS,REGISTER_SPEC0),32)
+    assembler.add_reg('%sBANK'   % task[0],make_regid(task[1],REGISTER_TYPE_STATUS,REGISTER_SPEC0),32) # virtual register
+    assembler.add_reg('%sIP'     % task[0],make_regid(task[1],REGISTER_TYPE_STATUS,REGISTER_SPEC0),32) # virtual register
     for reg_type in [('GPR',REGISTER_TYPE_LOCALGPR),('MMAP',REGISTER_TYPE_LOCALMMAP),('IOMAP',REGISTER_TYPE_LOCAL_IOMAP)]:
         assembler.add_reg('%s%s0' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC0),32)
         assembler.add_reg('%s%s1' % (task[0],reg_type[0]), make_regid(task[1],reg_type[1],REGISTER_SPEC1),32)
@@ -96,6 +98,33 @@ def encode_mapbank(asm,task_id,virtual_bank,physical_bank):
     retval += new_mmap # the new mmap value
     return retval
 
+def encode_allowmapall(asm,task_id,virtual_bank):
+    # this is not actually a real opcode, it's OPCODE_REGSAVE so we can assign stuff in global registers
+    # basically to do a MAPBANK we just update the mmap register for the specific task
+    reg_ctx = {0:REGISTER_CTX_TASK0,
+               1:REGISTER_CTX_TASK1,
+               2:REGISTER_CTX_TASK2,
+               3:REGISTER_CTX_TASK3}[task_id[1]]
+    reg_id = make_regid(reg_ctx,REGISTER_TYPE_LOCALMMAP,virtual_bank[1])
+
+    # now we need to assemble the new contents for the mmap register - see pegasus_docs/new_isa.txt
+    # we OR write it to the register, so anything we're not changing below must be 0
+    new_mmap = uniasm.assemble_bits('0'*16,                        # 16-bits reserved
+                                    '0'*4,                         # 4 bits reserved
+                                    '1110',                        # set all permissions
+                                     '0'*4)                        # physical bank
+   
+    # now let's assemble the actual code
+    retval  = ''
+    retval += chr(OPCODE_REGLOAD)
+    retval += uniasm.assemble_bits(format(reg_id,'#008b'),   # register ID
+                                   '10',                     # OR write and do not zero extend
+                                   '000',                    # set whole register
+                                   '010')                    # set from literal 32-bit
+    retval += new_mmap # the new mmap value
+    return retval
+
+
 # read pegassus_docs/instruction_set.txt for details on this stuff
 
 assembler.add_opcode('COPYBANK',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4),   # source bank
@@ -108,6 +137,9 @@ assembler.add_opcode('MAPBANK',[uniasm.Operand(from_reg=False,from_literal=True,
                                 uniasm.Operand(from_reg=False,from_literal=True,bitlength=8)],   # which physical bank do we want to assign to it?
                                 encoder_func=encode_mapbank)
 
+assembler.add_opcode('ALLOWMAPALL',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4), # which task?
+                                    uniasm.Operand(from_reg=False,from_literal=True,bitlength=4)], # which virtual bank?
+                                    encoder_func=encode_allowmapall)
 def do_line(l):
     print '"%s"  =>  0x%s' % (l,hexlify(assembler.assemble_line(l)))
 

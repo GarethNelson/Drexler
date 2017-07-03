@@ -66,20 +66,20 @@ exception_handler:
 ; main loop init (set stuff up and enable tasks first)
 main_loop_init:
 		; first we setup GPR0 for each task to the ASCII value for the letter A, B or C
-		SETTASKREG 1 GPR0 65
-		SETTASKREG 2 GPR0 66
-		SETTASKREG 3 GPR0 67
+		SETREG T1GPR0 65
+		SETREG T2GPR0 66
+		SETREG T3GPR0 67
 
 		; then we setup the bank register (set it to 1)
-		SETTASKREG 1 BANK 1
-		SETTASKREG 2 BANK 1
-		SETTASKREG 3 BANK 1
+                SETREG T1BANK 1
+                SETREG T2BANK 1
+                SETREG T3BANK 1
 		
 		; the default IP for all tasks is IP0, which in our case would mean attempting to run privileged code and fucking stuff up
 		; so let's set the IP for each task to point to the unprivileged code
-		SETTASKREG 1 IP 0
-		SETTASKREG 2 IP 0
-		SETTASKREG 3 IP 0
+                SETREG T1IP $user_code
+                SETREG T2IP $user_code
+                SETREG T3IP $user_code
 
 		ENABLETASK 1
 		ENABLETASK 2
