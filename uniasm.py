@@ -92,8 +92,17 @@ class Assembler:
            if ';' in line:
               line = line.split(';')[0] # for comments
            if len(line) <= 2: continue
+           line = line.strip()
            split_line = line.split(' ')
-           if not self.known_opcodes_operands.has_key(split_line[0]): return (False,self.bin_data,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
+           if split_line[0]=='db':
+             if split_line[1].isdigit():
+                self.bin_data += chr(int(split_line[1]))
+             else:
+                # we just assume it's a string here, but that's stupid
+                self.bin_data += line.split('"')[1]
+             continue
+           elif not self.known_opcodes_operands.has_key(split_line[0]):
+             return (False,self.bin_data,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
            try:
               self.bin_data += self.assemble_line(line)
            except Exception,e:
@@ -120,7 +129,11 @@ class Assembler:
            if ';' in line:
               line = line.split(';')[0] # for comments
            if len(line) <= 2: continue
+           line=line.strip()
            split_line = line.split(' ')
-           if not self.known_opcodes_operands.has_key(split_line[0]): return (False,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
+           if split_line[0]=='db':
+              pass
+           elif not self.known_opcodes_operands.has_key(split_line[0]):
+              return (False,'Error on line %d: unknown opcode %s ' % (line_no,split_line[0]))
        return (True,'OK')
 

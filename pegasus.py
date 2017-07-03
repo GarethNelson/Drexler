@@ -30,7 +30,7 @@ REGISTER_SPEC7 = '111'
 OPCODE_REGLOAD  = 0x01
 OPCODE_REGSAVE  = 0x02
 OPCODE_COPYBANK = 0x03
-
+OPCODE_JMPLOCAL = 0x04
 
 def make_regid(reg_ctx,reg_type,reg_specific):
     retval = '0b%s%s%s' % (reg_ctx,reg_type,reg_specific)
@@ -124,6 +124,58 @@ def encode_allowmapall(asm,task_id,virtual_bank):
     retval += new_mmap # the new mmap value
     return retval
 
+def encode_setsyscall(asm,bank,offset):
+    # this is another virtual opcode implemented using REGSAVE
+    reg_id = make_regid(REGISTER_CTX_GLOBAL,REGISTER_TYPE_GLOBALSYSCALL,REGISTER_SPEC0)
+    if offset[0]=='LITERAL':
+       new_syscall_reg = uniasm.assemble_bits('0'*8,                     # 8 bit syscall ID - blank by default for obvious reasons
+                                              format(bank[1],'#008b'),   # 8 bit physical bank ID
+                                              format(offset[1],'#016b')) # 16-bit memory offset
+    elif offset[0]=='VARIABLE':
+       new_syscall_reg = uniasm.assemble_bits('0'*8,                     # 8 bit syscall ID - blank by default for obvious reasons
+                                              format(bank[1],'#008b'),   # 8 bit physical bank ID
+                                              format(0xBEEF,'#016b')) # 16-bit memory offset
+       asm.add_cleanup(len(asm.bin_data)+2,offset[1])
+    retval  = ''
+    retval += chr(OPCODE_REGLOAD)
+    retval += uniasm.assemble_bits(format(reg_id,'#008b'),   # register ID
+                                   '10',                     # OR write and do not zero extend
+                                   '000',                    # set whole register
+                                   '010')                    # set from literal 32-bit
+    retval += new_syscall_reg # the new value
+    return retval
+
+
+def encode_setexception(asm,bank,offset):
+    # this is another virtual opcode implemented using REGSAVE
+    reg_id = make_regid(REGISTER_CTX_GLOBAL,REGISTER_TYPE_GLOBALEXC,REGISTER_SPEC0)
+    if offset[0]=='LITERAL':
+       new_exc_reg = uniasm.assemble_bits('0'*8,                     # 8 bit syscall ID - blank by default for obvious reasons
+                                              format(bank[1],'#008b'),   # 8 bit physical bank ID
+                                              format(offset[1],'#016b')) # 16-bit memory offset
+    elif offset[0]=='VARIABLE':
+       new_exc_reg = uniasm.assemble_bits('0'*8,                     # 8 bit syscall ID - blank by default for obvious reasons
+                                              format(bank[1],'#008b'),   # 8 bit physical bank ID
+                                              format(0xBEEF,'#016b')) # 16-bit memory offset
+       asm.add_cleanup(len(asm.bin_data)+2,offset[1])
+    retval  = ''
+    retval += chr(OPCODE_REGLOAD)
+    retval += uniasm.assemble_bits(format(reg_id,'#008b'),   # register ID
+                                   '10',                     # OR write and do not zero extend
+                                   '000',                    # set whole register
+                                   '010')                    # set from literal 32-bit
+    retval += new_exc_reg # the new value
+    return retval
+
+def encode_jmplocal(asm,offset):
+    retval  = ''
+    retval += chr(OPCODE_JMPLOCAL)
+    if offset[0]=='LITERAL':
+       retval += uniasm.assemble_bits(format(offset[1],'#016b'))
+    elif offset[0]=='VARIABLE':
+       retval += uniasm.assemble_bits(format(0xBEEF,'#016b'))
+       asm.add_cleanup(len(asm.bin_data)+1,offset[1])
+    return retval
 
 # read pegassus_docs/instruction_set.txt for details on this stuff
 
@@ -140,6 +192,18 @@ assembler.add_opcode('MAPBANK',[uniasm.Operand(from_reg=False,from_literal=True,
 assembler.add_opcode('ALLOWMAPALL',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=4), # which task?
                                     uniasm.Operand(from_reg=False,from_literal=True,bitlength=4)], # which virtual bank?
                                     encoder_func=encode_allowmapall)
+
+assembler.add_opcode('SETSYSCALL',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=8),   # which physical bank?
+                                   uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)], # which memory offset?
+                                   encoder_func=encode_setsyscall)
+
+assembler.add_opcode('SETEXCEPTION',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=8),   # which physical bank?
+                                     uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)], # which memory offset?
+                                     encoder_func=encode_setexception)
+
+assembler.add_opcode('JMPLOCAL',[uniasm.Operand(from_reg=False,from_literal=True,bitlength=16)],
+                                 encoder_func=encode_jmplocal)
+
 def do_line(l):
     print '"%s"  =>  0x%s' % (l,hexlify(assembler.assemble_line(l)))
 
